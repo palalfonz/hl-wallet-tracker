@@ -1,0 +1,13 @@
+# Config (contains secrets)
+config.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Claude
+.claude/

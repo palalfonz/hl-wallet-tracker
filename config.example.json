@@ -1,0 +1,12 @@
+{
+  "telegram_token": "YOUR_BOT_TOKEN_HERE",
+  "telegram_chat_id": "YOUR_CHAT_ID_HERE",
+  "poll_interval_seconds": 10,
+  "my_wallet": "",
+  "wallets": [
+    {
+      "address": "0xYOUR_WALLET_ADDRESS",
+      "label": "Whale 1"
+    }
+  ]
+}
