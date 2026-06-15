@@ -1,9 +1,10 @@
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from telegram import Update
 from telegram.ext import ContextTypes
 from . import __version__
-from .formatting import fmt_active_trades, fmt_positions
+from .formatting import fmt_active_trades, fmt_positions, fmt_trending
 from .hyperliquid import get_positions
 
 log = logging.getLogger(__name__)
@@ -158,6 +159,28 @@ async def cmd_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error: {e}")
 
 
+# ── Trending ─────────────────────────────────────────────────────────────────
+
+async def cmd_trending(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Usage: /trending [days]  — default 7"""
+    if not _is_authorized(update, context):
+        return
+    try:
+        days = int(context.args[0]) if context.args else 7
+        if days < 1:
+            await update.message.reply_text("Days must be at least 1.")
+            return
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+        history = context.bot_data["state"].get_history(since)
+        msg = fmt_trending(history, days)
+        await update.message.reply_text(msg, parse_mode="HTML")
+    except ValueError:
+        await update.message.reply_text("Usage: /trending [days]  e.g. /trending 30")
+    except Exception as e:
+        log.exception("Error in /trending")
+        await update.message.reply_text(f"Error: {e}")
+
+
 # ── Help ─────────────────────────────────────────────────────────────────────
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -171,6 +194,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "My wallet:\n"
         "/set_my_wallet <address> — set your personal wallet\n"
         "/my_wallet — view your open positions\n\n"
+        "/trending [days] — most traded tokens (default 7d)\n"
         "/help — show this message"
     )
     await update.message.reply_text(text)

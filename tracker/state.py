@@ -1,9 +1,11 @@
 import threading
+from datetime import datetime, timezone
 
 
 class WalletState:
     def __init__(self):
         self._state: dict[str, dict] = {}
+        self._history: list[dict] = []
         self._lock = threading.Lock()
 
     def seed(self, address: str, positions: dict):
@@ -38,3 +40,16 @@ class WalletState:
     def get_all_positions(self) -> dict[str, dict]:
         with self._lock:
             return dict(self._state)
+
+    def log_event(self, event: dict, label: str):
+        with self._lock:
+            self._history.append({
+                "ts": datetime.now(timezone.utc),
+                "coin": event["coin"],
+                "type": event["type"],
+                "label": label,
+            })
+
+    def get_history(self, since: datetime) -> list[dict]:
+        with self._lock:
+            return [e for e in self._history if e["ts"] >= since]

@@ -16,6 +16,7 @@ from tracker.bot import (
     cmd_my_wallet,
     cmd_remove_wallet,
     cmd_set_my_wallet,
+    cmd_trending,
     cmd_wallets,
 )
 from tracker import __version__
@@ -42,6 +43,7 @@ BOT_COMMANDS = [
     BotCommand("remove_wallet",  "Stop tracking a wallet — /remove_wallet <label>"),
     BotCommand("set_my_wallet",  "Set your personal wallet — /set_my_wallet <address>"),
     BotCommand("my_wallet",      "View your open positions"),
+    BotCommand("trending",       "Most traded tokens — /trending [days]"),
     BotCommand("help",           "Show all commands"),
 ]
 
@@ -83,6 +85,7 @@ def run():
     app.add_handler(CommandHandler("remove_wallet",  cmd_remove_wallet))
     app.add_handler(CommandHandler("set_my_wallet",  cmd_set_my_wallet))
     app.add_handler(CommandHandler("my_wallet",      cmd_my_wallet))
+    app.add_handler(CommandHandler("trending",       cmd_trending))
     app.add_handler(CommandHandler("help",           cmd_help))
 
     event_loop = asyncio.new_event_loop()

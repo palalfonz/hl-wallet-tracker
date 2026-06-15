@@ -1,3 +1,4 @@
+from collections import Counter
 from .state import WalletState
 
 SIDE_EMOJI = {"LONG": "🟢", "SHORT": "🔴"}
@@ -93,3 +94,14 @@ def fmt_event(event: dict, label: str) -> str:
             f"📦 Size    <code>{abs(old['size']):.4f}</code> → <code>{abs(p['size']):.4f}</code>"
         )
     return f"❓ Unknown event for {coin}"
+
+
+def fmt_trending(history: list[dict], days: int) -> str:
+    if not history:
+        return f"👻 No trades recorded in the last {days}d."
+    counts = Counter(e["coin"] for e in history)
+    lines = [f"🔥 <b>Trending — last {days}d</b>  ({len(history)} events)\n"]
+    for i, (coin, count) in enumerate(counts.most_common(10), 1):
+        bar = "▓" * min(count, 10)
+        lines.append(f"{i}. <b>{coin}</b>  {bar}  <code>{count}</code>")
+    return "\n".join(lines)

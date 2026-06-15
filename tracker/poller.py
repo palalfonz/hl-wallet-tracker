@@ -31,6 +31,7 @@ def poll_loop(config: dict, state: WalletState, send_fn):
                 events = state.update(addr, positions)
                 for ev in events:
                     send_fn(fmt_event(ev, label))
+                    state.log_event(ev, label)
                     log.info("Event [%s] %s %s", ev["type"], label, ev["coin"])
             except Exception as e:
                 log.warning("Error polling %s: %s", addr, e)

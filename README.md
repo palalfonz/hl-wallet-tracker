@@ -1,5 +1,7 @@
 # Hyperliquid Wallet Tracker
 
+> v1.1.0
+
 A Telegram bot that monitors Hyperliquid wallets and sends real-time alerts when positions are opened, closed, increased, decreased, or flipped.
 
 ## Features
@@ -8,6 +10,7 @@ A Telegram bot that monitors Hyperliquid wallets and sends real-time alerts when
 - Alerts on: open, close, increase, decrease, and flip events
 - `/active_trades` — snapshot of all open positions across tracked wallets
 - `/my_wallet` — view your personal wallet's positions on demand
+- `/trending [days]` — most traded tokens over the last N days (default 7)
 - Add/remove wallets at runtime via bot commands
 - Wallet list persisted to `config.json`
 
@@ -79,6 +82,7 @@ In the ScriptHub dashboard → **+ Add Script**:
 | `/remove_wallet <label>` | Stop tracking a wallet |
 | `/set_my_wallet <address>` | Set your personal wallet |
 | `/my_wallet` | View your personal wallet's positions |
+| `/trending [days]` | Most traded tokens — default 7d, e.g. `/trending 30` |
 | `/help` | Show all commands |
 
 ## Config reference
