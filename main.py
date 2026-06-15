@@ -1,6 +1,9 @@
 import asyncio
 import json
 import logging
+import sys
+import traceback
+from datetime import datetime
 from threading import Thread
 
 from telegram import BotCommand
@@ -19,8 +22,18 @@ from tracker import __version__
 from tracker.poller import poll_loop
 from tracker.state import WalletState
 
+
+def log(msg: str, level: str = "INFO"):
+    ts = datetime.now().strftime("%H:%M:%S")
+    print(f"[{ts}] [{level}] {msg}", flush=True)
+
+
+def log_error(msg: str):
+    log(msg, "ERROR")
+    print(f"[ERROR] {msg}", file=sys.stderr, flush=True)
+
+
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
-log = logging.getLogger(__name__)
 
 BOT_COMMANDS = [
     BotCommand("active_trades",  "Open positions across all tracked wallets"),
@@ -33,7 +46,9 @@ BOT_COMMANDS = [
 ]
 
 
-def main():
+def run():
+    log(f"Hyperliquid Wallet Tracker v{__version__} starting")
+
     with open("config.json") as f:
         config = json.load(f)
 
@@ -55,7 +70,7 @@ def main():
         loop_holder[0] = asyncio.get_running_loop()
         await application.bot.set_my_commands(BOT_COMMANDS)
         Thread(target=poll_loop, args=(config, state, send_fn), daemon=True).start()
-        log.info("Command menu registered.")
+        log("Command menu registered")
 
     app = Application.builder().token(token).post_init(post_init).build()
     app.bot_data["state"] = state
@@ -70,11 +85,24 @@ def main():
     app.add_handler(CommandHandler("my_wallet",      cmd_my_wallet))
     app.add_handler(CommandHandler("help",           cmd_help))
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    event_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(event_loop)
 
-    log.info("Hyperliquid Wallet Tracker v%s started.", __version__)
+    log("Bot polling started")
     app.run_polling(drop_pending_updates=True)
+
+
+def main():
+    try:
+        run()
+        sys.exit(0)
+    except KeyboardInterrupt:
+        log("Stopped by user", "WARN")
+        sys.exit(0)
+    except Exception:
+        log_error("Unhandled exception:")
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -15,9 +15,16 @@ def _save_config(config: dict):
         json.dump(config, f, indent=2)
 
 
+def _is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    allowed = str(context.bot_data["config"].get("telegram_chat_id", ""))
+    return str(update.effective_chat.id) == allowed
+
+
 # ── Watched wallets ──────────────────────────────────────────────────────────
 
 async def cmd_active_trades(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_authorized(update, context):
+        return
     try:
         msg = fmt_active_trades(context.bot_data["state"], context.bot_data["wallets"])
         await update.message.reply_text(msg, parse_mode="HTML")
@@ -27,6 +34,8 @@ async def cmd_active_trades(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_wallets(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_authorized(update, context):
+        return
     try:
         wallets = context.bot_data["wallets"]
         if not wallets:
@@ -43,6 +52,8 @@ async def cmd_wallets(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_add_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Usage: /add_wallet <address> <label>"""
+    if not _is_authorized(update, context):
+        return
     try:
         args = context.args
         if len(args) < 2:
@@ -63,12 +74,11 @@ async def cmd_add_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.bot_data["wallets"] = config["wallets"]
         _save_config(config)
 
-        # Seed state for new wallet
         try:
             positions = get_positions(address)
             context.bot_data["state"].seed(address, positions)
         except Exception:
-            pass
+            log.warning("Failed to seed initial positions for %s", address)
 
         await update.message.reply_text(f"Now tracking {label} ({address[:10]}...)")
         log.info("Added wallet %s (%s)", label, address)
@@ -79,6 +89,8 @@ async def cmd_add_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_remove_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Usage: /remove_wallet <label>"""
+    if not _is_authorized(update, context):
+        return
     try:
         if not context.args:
             await update.message.reply_text("Usage: /remove_wallet <label>")
@@ -108,6 +120,8 @@ async def cmd_remove_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_set_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Usage: /set_my_wallet <address>"""
+    if not _is_authorized(update, context):
+        return
     try:
         if not context.args:
             await update.message.reply_text("Usage: /set_my_wallet <address>")
@@ -125,6 +139,8 @@ async def cmd_set_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_authorized(update, context):
+        return
     try:
         config = context.bot_data["config"]
         address = config.get("my_wallet", "")
