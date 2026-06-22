@@ -1,6 +1,6 @@
 # Hyperliquid Wallet Tracker
 
-> v1.1.0
+> v1.2.0
 
 A Telegram bot that monitors Hyperliquid wallets and sends real-time alerts when positions are opened, closed, increased, decreased, or flipped.
 
@@ -12,6 +12,8 @@ A Telegram bot that monitors Hyperliquid wallets and sends real-time alerts when
 - `/my_wallet` — view your personal wallet's positions on demand
 - `/trending [days]` — most traded tokens over the last N days (default 7)
 - Add/remove wallets at runtime via bot commands
+- TP/SL orders shown on alerts and position snapshots with % distance from entry
+- Size displayed as `154.3000 HYPE ($10,352.14)`
 - Wallet list persisted to `config.json`
 
 ## Setup
