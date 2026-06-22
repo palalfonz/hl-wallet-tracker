@@ -1,6 +1,6 @@
 import time
 import logging
-from .hyperliquid import get_positions
+from .hyperliquid import get_orders, get_positions
 from .formatting import fmt_event
 from .state import WalletState
 
@@ -29,8 +29,16 @@ def poll_loop(config: dict, state: WalletState, send_fn):
             try:
                 positions = get_positions(addr)
                 events = state.update(addr, positions)
+                open_events = [ev for ev in events if ev["type"] == "OPEN"]
+                orders = {}
+                if open_events:
+                    try:
+                        orders = get_orders(addr)
+                    except Exception as e:
+                        log.warning("Failed to fetch orders for %s: %s", addr, e)
                 for ev in events:
-                    send_fn(fmt_event(ev, label))
+                    coin_orders = orders.get(ev["coin"]) if ev["type"] == "OPEN" else None
+                    send_fn(fmt_event(ev, label, coin_orders))
                     state.log_event(ev, label)
                     log.info("Event [%s] %s %s", ev["type"], label, ev["coin"])
             except Exception as e:

@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from . import __version__
 from .formatting import fmt_active_trades, fmt_positions, fmt_trending
-from .hyperliquid import get_positions
+from .hyperliquid import get_orders, get_positions
 
 log = logging.getLogger(__name__)
 CONFIG_PATH = "config.json"
@@ -27,7 +27,14 @@ async def cmd_active_trades(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_authorized(update, context):
         return
     try:
-        msg = fmt_active_trades(context.bot_data["state"], context.bot_data["wallets"])
+        wallets = context.bot_data["wallets"]
+        all_orders = {}
+        for w in wallets:
+            try:
+                all_orders[w["address"].lower()] = get_orders(w["address"])
+            except Exception:
+                pass
+        msg = fmt_active_trades(context.bot_data["state"], wallets, all_orders)
         await update.message.reply_text(msg, parse_mode="HTML")
     except Exception as e:
         log.exception("Error in /active_trades")
@@ -152,7 +159,11 @@ async def cmd_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         positions = get_positions(address)
-        msg = fmt_positions(positions, label="My Wallet")
+        try:
+            orders = get_orders(address)
+        except Exception:
+            orders = {}
+        msg = fmt_positions(positions, label="My Wallet", orders=orders)
         await update.message.reply_text(msg, parse_mode="HTML")
     except Exception as e:
         log.exception("Error in /my_wallet")

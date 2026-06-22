@@ -2,6 +2,9 @@ import requests
 
 HL_API = "https://api.hyperliquid.xyz/info"
 
+_TP_TYPES = {"Take Profit Market", "Take Profit Limit"}
+_SL_TYPES = {"Stop Market", "Stop Limit"}
+
 
 def get_positions(address: str) -> dict:
     resp = requests.post(
@@ -23,5 +26,29 @@ def get_positions(address: str) -> dict:
             "entry_px": float(pos.get("entryPx", 0)),
             "unrealized_pnl": float(pos.get("unrealizedPnl", 0)),
             "leverage": pos.get("leverage", {}).get("value", "?"),
+            "position_value": float(pos.get("positionValue", 0)),
         }
     return positions
+
+
+def get_orders(address: str) -> dict:
+    """Returns {coin: {"tp": [price, ...], "sl": price | None}}"""
+    resp = requests.post(
+        HL_API,
+        json={"type": "openOrders", "user": address},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    result: dict[str, dict] = {}
+    for order in resp.json():
+        coin = order.get("coin", "?")
+        order_type = order.get("orderType", "")
+        price = float(order.get("limitPx", 0))
+        entry = result.setdefault(coin, {"tp": [], "sl": None})
+        if order_type in _TP_TYPES:
+            entry["tp"].append(price)
+        elif order_type in _SL_TYPES:
+            entry["sl"] = price
+    for coin in result:
+        result[coin]["tp"].sort()
+    return result

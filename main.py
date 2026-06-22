@@ -74,7 +74,16 @@ def run():
         Thread(target=poll_loop, args=(config, state, send_fn), daemon=True).start()
         log("Command menu registered")
 
-    app = Application.builder().token(token).post_init(post_init).build()
+    app = (
+        Application.builder()
+        .token(token)
+        .post_init(post_init)
+        .get_updates_read_timeout(30)
+        .get_updates_write_timeout(30)
+        .get_updates_connect_timeout(30)
+        .get_updates_pool_timeout(30)
+        .build()
+    )
     app.bot_data["state"] = state
     app.bot_data["config"] = config
     app.bot_data["wallets"] = config["wallets"]
@@ -92,7 +101,7 @@ def run():
     asyncio.set_event_loop(event_loop)
 
     log("Bot polling started")
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling(drop_pending_updates=True, timeout=20)
 
 
 def main():
