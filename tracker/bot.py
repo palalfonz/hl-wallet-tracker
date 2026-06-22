@@ -28,10 +28,12 @@ async def cmd_active_trades(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         wallets = context.bot_data["wallets"]
+        all_pos = context.bot_data["state"].get_all_positions()
         all_orders = {}
         for w in wallets:
             try:
-                all_orders[w["address"].lower()] = get_orders(w["address"])
+                addr = w["address"].lower()
+                all_orders[addr] = get_orders(w["address"], all_pos.get(addr, {}))
             except Exception:
                 pass
         msg = fmt_active_trades(context.bot_data["state"], wallets, all_orders)
@@ -160,7 +162,7 @@ async def cmd_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         positions = get_positions(address)
         try:
-            orders = get_orders(address)
+            orders = get_orders(address, positions)
         except Exception:
             orders = {}
         msg = fmt_positions(positions, label="My Wallet", orders=orders)

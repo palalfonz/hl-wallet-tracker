@@ -33,7 +33,7 @@ def poll_loop(config: dict, state: WalletState, send_fn):
                 orders = {}
                 if open_events:
                     try:
-                        orders = get_orders(addr)
+                        orders = get_orders(addr, positions)
                     except Exception as e:
                         log.warning("Failed to fetch orders for %s: %s", addr, e)
                 for ev in events:
