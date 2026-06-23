@@ -7,7 +7,7 @@ from .state import WalletState
 log = logging.getLogger(__name__)
 
 
-def poll_loop(config: dict, state: WalletState, send_fn):
+def poll_loop(config: dict, state: WalletState, send_fn, heartbeat: list | None = None):
     wallets = config["wallets"]
     interval = config.get("poll_interval_seconds", 10)
     label_map = {w["address"].lower(): w.get("label", w["address"][:8]) for w in wallets}
@@ -23,6 +23,8 @@ def poll_loop(config: dict, state: WalletState, send_fn):
     log.info("Polling every %ds for %d wallet(s)…", interval, len(wallets))
     while True:
         time.sleep(interval)
+        if heartbeat is not None:
+            heartbeat[0] = time.time()
         for w in wallets:
             addr = w["address"]
             label = label_map.get(addr.lower(), addr[:8])
