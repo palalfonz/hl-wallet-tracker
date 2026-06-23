@@ -1,7 +1,9 @@
 import asyncio
 import json
 import logging
+import os
 import sys
+import time
 import traceback
 from datetime import datetime
 from threading import Thread
@@ -48,6 +50,19 @@ BOT_COMMANDS = [
 ]
 
 
+WATCHDOG_TIMEOUT = 120  # seconds — kill process if no heartbeat
+
+
+def start_watchdog(heartbeat: list):
+    def _watch():
+        while True:
+            time.sleep(30)
+            if time.time() - heartbeat[0] > WATCHDOG_TIMEOUT:
+                log("Watchdog: no heartbeat for 2 min — forcing restart", "ERROR")
+                os.kill(os.getpid(), 9)
+    Thread(target=_watch, daemon=True).start()
+
+
 def run():
     log(f"Hyperliquid Wallet Tracker v{__version__} starting")
 
@@ -68,10 +83,13 @@ def run():
             loop,
         )
 
+    heartbeat = [time.time()]
+    start_watchdog(heartbeat)
+
     async def post_init(application):
         loop_holder[0] = asyncio.get_running_loop()
         await application.bot.set_my_commands(BOT_COMMANDS)
-        Thread(target=poll_loop, args=(config, state, send_fn), daemon=True).start()
+        Thread(target=poll_loop, args=(config, state, send_fn, heartbeat), daemon=True).start()
         log("Command menu registered")
 
     app = (
