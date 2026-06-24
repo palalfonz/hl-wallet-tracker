@@ -37,6 +37,8 @@ def log_error(msg: str):
 
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 BOT_COMMANDS = [
     BotCommand("active_trades",  "Open positions across all tracked wallets"),
