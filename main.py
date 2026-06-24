@@ -37,7 +37,7 @@ def log_error(msg: str):
     print(f"[ERROR] {msg}", file=sys.stderr, flush=True)
 
 
-logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
@@ -135,7 +135,7 @@ def main():
         sys.exit(0)
     except Exception:
         log_error("Unhandled exception:")
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stdout)
         sys.exit(1)
 
 
