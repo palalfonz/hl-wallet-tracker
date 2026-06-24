@@ -21,6 +21,20 @@ def _is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return str(update.effective_chat.id) == allowed
 
 
+async def log_incoming(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message and update.message.text:
+        log.info("TG ← %s (chat %s)", update.message.text, update.effective_chat.id)
+
+
+async def _reply(update: Update, cmd: str, text: str, **kwargs):
+    try:
+        await update.message.reply_text(text, **kwargs)
+        log.info("TG → %s OK", cmd)
+    except Exception as e:
+        log.error("TG → %s FAILED: %s", cmd, e)
+        raise
+
+
 # ── Watched wallets ──────────────────────────────────────────────────────────
 
 async def cmd_active_trades(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -37,10 +51,10 @@ async def cmd_active_trades(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
         msg = fmt_active_trades(context.bot_data["state"], wallets, all_orders)
-        await update.message.reply_text(msg, parse_mode="HTML")
+        await _reply(update, "/active_trades", msg, parse_mode="HTML")
     except Exception as e:
         log.exception("Error in /active_trades")
-        await update.message.reply_text(f"Error: {e}")
+        await _reply(update, "/active_trades", f"Error: {e}")
 
 
 async def cmd_wallets(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -49,15 +63,15 @@ async def cmd_wallets(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         wallets = context.bot_data["wallets"]
         if not wallets:
-            await update.message.reply_text("No wallets being tracked.")
+            await _reply(update, "/wallets", "No wallets being tracked.")
             return
         lines = ["Tracked wallets:\n"] + [
             f"• {w.get('label', 'Unlabeled')} — {w['address']}" for w in wallets
         ]
-        await update.message.reply_text("\n".join(lines))
+        await _reply(update, "/wallets", "\n".join(lines))
     except Exception as e:
         log.exception("Error in /wallets")
-        await update.message.reply_text(f"Error: {e}")
+        await _reply(update, "/wallets", f"Error: {e}")
 
 
 async def cmd_add_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -67,16 +81,15 @@ async def cmd_add_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         args = context.args
         if len(args) < 2:
-            await update.message.reply_text("Usage: /add_wallet <address> <label>")
+            await _reply(update, "/add_wallet", "Usage: /add_wallet <address> <label>")
             return
 
         address = args[0].lower()
         label = " ".join(args[1:])
         config = context.bot_data["config"]
 
-        # Check duplicate
         if any(w["address"].lower() == address for w in config["wallets"]):
-            await update.message.reply_text(f"Wallet {address[:10]}... is already being tracked.")
+            await _reply(update, "/add_wallet", f"Wallet {address[:10]}... is already being tracked.")
             return
 
         new_wallet = {"address": address, "label": label}
@@ -90,11 +103,11 @@ async def cmd_add_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             log.warning("Failed to seed initial positions for %s", address)
 
-        await update.message.reply_text(f"Now tracking {label} ({address[:10]}...)")
+        await _reply(update, "/add_wallet", f"Now tracking {label} ({address[:10]}...)")
         log.info("Added wallet %s (%s)", label, address)
     except Exception as e:
         log.exception("Error in /add_wallet")
-        await update.message.reply_text(f"Error: {e}")
+        await _reply(update, "/add_wallet", f"Error: {e}")
 
 
 async def cmd_remove_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -103,7 +116,7 @@ async def cmd_remove_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         if not context.args:
-            await update.message.reply_text("Usage: /remove_wallet <label>")
+            await _reply(update, "/remove_wallet", "Usage: /remove_wallet <label>")
             return
 
         label = " ".join(context.args).lower()
@@ -114,16 +127,16 @@ async def cmd_remove_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         if len(config["wallets"]) == before:
-            await update.message.reply_text(f"No wallet with label '{label}' found.")
+            await _reply(update, "/remove_wallet", f"No wallet with label '{label}' found.")
             return
 
         context.bot_data["wallets"] = config["wallets"]
         _save_config(config)
-        await update.message.reply_text(f"Removed wallet '{label}'.")
+        await _reply(update, "/remove_wallet", f"Removed wallet '{label}'.")
         log.info("Removed wallet with label %s", label)
     except Exception as e:
         log.exception("Error in /remove_wallet")
-        await update.message.reply_text(f"Error: {e}")
+        await _reply(update, "/remove_wallet", f"Error: {e}")
 
 
 # ── My wallet ────────────────────────────────────────────────────────────────
@@ -134,18 +147,18 @@ async def cmd_set_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         if not context.args:
-            await update.message.reply_text("Usage: /set_my_wallet <address>")
+            await _reply(update, "/set_my_wallet", "Usage: /set_my_wallet <address>")
             return
 
         address = context.args[0].lower()
         config = context.bot_data["config"]
         config["my_wallet"] = address
         _save_config(config)
-        await update.message.reply_text(f"Your wallet set to {address[:10]}...")
+        await _reply(update, "/set_my_wallet", f"Your wallet set to {address[:10]}...")
         log.info("my_wallet set to %s", address)
     except Exception as e:
         log.exception("Error in /set_my_wallet")
-        await update.message.reply_text(f"Error: {e}")
+        await _reply(update, "/set_my_wallet", f"Error: {e}")
 
 
 async def cmd_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -166,10 +179,10 @@ async def cmd_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             orders = {}
         msg = fmt_positions(positions, label="My Wallet", orders=orders)
-        await update.message.reply_text(msg, parse_mode="HTML")
+        await _reply(update, "/my_wallet", msg, parse_mode="HTML")
     except Exception as e:
         log.exception("Error in /my_wallet")
-        await update.message.reply_text(f"Error: {e}")
+        await _reply(update, "/my_wallet", f"Error: {e}")
 
 
 # ── Trending ─────────────────────────────────────────────────────────────────
@@ -186,12 +199,12 @@ async def cmd_trending(update: Update, context: ContextTypes.DEFAULT_TYPE):
         since = datetime.now(timezone.utc) - timedelta(days=days)
         history = context.bot_data["state"].get_history(since)
         msg = fmt_trending(history, days)
-        await update.message.reply_text(msg, parse_mode="HTML")
+        await _reply(update, "/trending", msg, parse_mode="HTML")
     except ValueError:
-        await update.message.reply_text("Usage: /trending [days]  e.g. /trending 30")
+        await _reply(update, "/trending", "Usage: /trending [days]  e.g. /trending 30")
     except Exception as e:
         log.exception("Error in /trending")
-        await update.message.reply_text(f"Error: {e}")
+        await _reply(update, "/trending", f"Error: {e}")
 
 
 # ── Help ─────────────────────────────────────────────────────────────────────
@@ -210,4 +223,4 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/trending [days] — most traded tokens (default 7d)\n"
         "/help — show this message"
     )
-    await update.message.reply_text(text)
+    await _reply(update, "/help", text)

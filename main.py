@@ -9,7 +9,7 @@ from datetime import datetime
 from threading import Thread
 
 from telegram import BotCommand
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from tracker.bot import (
     cmd_active_trades,
@@ -20,6 +20,7 @@ from tracker.bot import (
     cmd_set_my_wallet,
     cmd_trending,
     cmd_wallets,
+    log_incoming,
 )
 from tracker import __version__
 from tracker.poller import poll_loop
@@ -37,6 +38,8 @@ def log_error(msg: str):
 
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 BOT_COMMANDS = [
     BotCommand("active_trades",  "Open positions across all tracked wallets"),
@@ -106,6 +109,7 @@ def run():
     app.bot_data["config"] = config
     app.bot_data["wallets"] = config["wallets"]
 
+    app.add_handler(MessageHandler(filters.TEXT, log_incoming), group=-1)
     app.add_handler(CommandHandler("active_trades",  cmd_active_trades))
     app.add_handler(CommandHandler("wallets",        cmd_wallets))
     app.add_handler(CommandHandler("add_wallet",     cmd_add_wallet))
