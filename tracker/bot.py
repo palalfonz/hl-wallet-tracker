@@ -21,6 +21,11 @@ def _is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return str(update.effective_chat.id) == allowed
 
 
+async def log_incoming(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message and update.message.text:
+        log.info("TG ← %s (chat %s)", update.message.text, update.effective_chat.id)
+
+
 # ── Watched wallets ──────────────────────────────────────────────────────────
 
 async def cmd_active_trades(update: Update, context: ContextTypes.DEFAULT_TYPE):
