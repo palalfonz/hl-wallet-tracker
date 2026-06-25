@@ -16,13 +16,16 @@ def get_positions(address: str) -> dict:
         if szi == 0:
             continue
         coin = pos.get("coin", "?")
+        position_value = float(pos.get("positionValue", 0))
+        mark_px = position_value / abs(szi) if szi else 0
         positions[coin] = {
             "size": szi,
             "side": "LONG" if szi > 0 else "SHORT",
             "entry_px": float(pos.get("entryPx", 0)),
+            "mark_px": mark_px,
             "unrealized_pnl": float(pos.get("unrealizedPnl", 0)),
             "leverage": pos.get("leverage", {}).get("value", "?"),
-            "position_value": float(pos.get("positionValue", 0)),
+            "position_value": position_value,
         }
     return positions
 

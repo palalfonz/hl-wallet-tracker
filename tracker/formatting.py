@@ -45,10 +45,12 @@ def _fmt_single_position(coin: str, p: dict, label: str, orders: dict | None = N
     margin = usd / leverage if usd else 0
     pnl_pct = f"  <code>({pnl_sign}{pnl / margin * 100:.2f}%)</code>" if margin else ""
     orders_str = _fmt_orders(p["entry_px"], p["side"], orders)
+    mark_px = p.get("mark_px", 0)
+    mark_str = f"  <code>Mark ${mark_px:,.2f}</code>" if mark_px else ""
     return (
         f"{side_icon} <b>{label}</b>  ·  <b>{coin}</b>  ·  {p['side']}  ·  {p['leverage']}x\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"📌 Entry   <code>${p['entry_px']:,.2f}</code>\n"
+        f"📌 Entry   <code>${p['entry_px']:,.2f}</code>{mark_str}\n"
         f"📦 Size    <code>{abs(p['size']):.4f} {coin}</code>{usd_str}\n"
         f"{pnl_icon} PnL     <code>{pnl_sign}{pnl:.2f} USD</code>{pnl_pct}"
         f"{orders_str}"
