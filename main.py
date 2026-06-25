@@ -18,6 +18,8 @@ from tracker.bot import (
     cmd_my_wallet,
     cmd_remove_wallet,
     cmd_set_my_wallet,
+    cmd_status,
+    cmd_summary,
     cmd_trending,
     cmd_wallets,
     log_incoming,
@@ -49,6 +51,8 @@ BOT_COMMANDS = [
     BotCommand("set_my_wallet",  "Set your personal wallet — /set_my_wallet <address>"),
     BotCommand("my_wallet",      "View your open positions"),
     BotCommand("trending",       "Most traded tokens — /trending [days]"),
+    BotCommand("summary",        "Today's PnL or /summary <address> for any wallet"),
+    BotCommand("status",         "Bot uptime and health"),
     BotCommand("help",           "Show all commands"),
 ]
 
@@ -108,6 +112,8 @@ def run():
     app.bot_data["state"] = state
     app.bot_data["config"] = config
     app.bot_data["wallets"] = config["wallets"]
+    app.bot_data["start_time"] = time.time()
+    app.bot_data["last_poll"] = time.time()
 
     app.add_handler(MessageHandler(filters.TEXT, log_incoming), group=-1)
     app.add_handler(CommandHandler("active_trades",  cmd_active_trades))
@@ -117,6 +123,8 @@ def run():
     app.add_handler(CommandHandler("set_my_wallet",  cmd_set_my_wallet))
     app.add_handler(CommandHandler("my_wallet",      cmd_my_wallet))
     app.add_handler(CommandHandler("trending",       cmd_trending))
+    app.add_handler(CommandHandler("summary",        cmd_summary))
+    app.add_handler(CommandHandler("status",         cmd_status))
     app.add_handler(CommandHandler("help",           cmd_help))
 
     event_loop = asyncio.new_event_loop()

@@ -1,10 +1,11 @@
 import json
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from telegram import Update
 from telegram.ext import ContextTypes
 from . import __version__
-from .formatting import fmt_active_trades, fmt_positions, fmt_trending
+from .formatting import fmt_active_trades, fmt_daily_summary, fmt_positions, fmt_status, fmt_trending
 from .hyperliquid import get_orders, get_positions
 
 log = logging.getLogger(__name__)
@@ -207,6 +208,47 @@ async def cmd_trending(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _reply(update, "/trending", f"Error: {e}")
 
 
+# ── Status ───────────────────────────────────────────────────────────────────
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_authorized(update, context):
+        return
+    try:
+        uptime = time.time() - context.bot_data["start_time"]
+        last_poll = context.bot_data.get("last_poll", context.bot_data["start_time"])
+        msg = fmt_status(uptime, context.bot_data["wallets"], last_poll)
+        await _reply(update, "/status", msg, parse_mode="HTML")
+    except Exception as e:
+        log.exception("Error in /status")
+        await _reply(update, "/status", f"Error: {e}")
+
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+
+async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Usage: /summary [address]  — address lookup or today's PnL summary"""
+    if not _is_authorized(update, context):
+        return
+    try:
+        if context.args:
+            address = context.args[0].lower()
+            positions = get_positions(address)
+            try:
+                orders = get_orders(address, positions)
+            except Exception:
+                orders = {}
+            msg = fmt_positions(positions, label=address[:10] + "...", orders=orders)
+            await _reply(update, "/summary", msg, parse_mode="HTML")
+        else:
+            since = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            history = context.bot_data["state"].get_history(since)
+            msg = fmt_daily_summary(history, context.bot_data["wallets"])
+            await _reply(update, "/summary", msg, parse_mode="HTML")
+    except Exception as e:
+        log.exception("Error in /summary")
+        await _reply(update, "/summary", f"Error: {e}")
+
+
 # ── Help ─────────────────────────────────────────────────────────────────────
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -221,6 +263,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/set_my_wallet <address> — set your personal wallet\n"
         "/my_wallet — view your open positions\n\n"
         "/trending [days] — most traded tokens (default 7d)\n"
+        "/summary — today's PnL summary\n"
+        "/summary <address> — on-demand positions for any address\n"
+        "/status — bot uptime and health\n"
         "/help — show this message"
     )
     await _reply(update, "/help", text)

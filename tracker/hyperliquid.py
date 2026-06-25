@@ -18,11 +18,13 @@ def get_positions(address: str) -> dict:
         coin = pos.get("coin", "?")
         position_value = float(pos.get("positionValue", 0))
         mark_px = position_value / abs(szi) if szi else 0
+        liq_px_raw = pos.get("liquidationPx")
         positions[coin] = {
             "size": szi,
             "side": "LONG" if szi > 0 else "SHORT",
             "entry_px": float(pos.get("entryPx", 0)),
             "mark_px": mark_px,
+            "liq_px": float(liq_px_raw) if liq_px_raw else None,
             "unrealized_pnl": float(pos.get("unrealizedPnl", 0)),
             "leverage": pos.get("leverage", {}).get("value", "?"),
             "position_value": position_value,
