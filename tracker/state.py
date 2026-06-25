@@ -1,11 +1,33 @@
+import json
+import os
 import threading
 from datetime import datetime, timezone
+
+HISTORY_FILE = "history.json"
+
+
+def _load_history() -> list[dict]:
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        with open(HISTORY_FILE) as f:
+            raw = json.load(f)
+        for e in raw:
+            e["ts"] = datetime.fromisoformat(e["ts"])
+        return raw
+    except Exception:
+        return []
+
+
+def _save_history(history: list[dict]):
+    with open(HISTORY_FILE, "w") as f:
+        json.dump([{**e, "ts": e["ts"].isoformat()} for e in history], f)
 
 
 class WalletState:
     def __init__(self):
         self._state: dict[str, dict] = {}
-        self._history: list[dict] = []
+        self._history: list[dict] = _load_history()
         self._lock = threading.Lock()
 
     def seed(self, address: str, positions: dict):
@@ -42,13 +64,16 @@ class WalletState:
             return dict(self._state)
 
     def log_event(self, event: dict, label: str):
+        entry = {
+            "ts": datetime.now(timezone.utc),
+            "coin": event["coin"],
+            "type": event["type"],
+            "label": label,
+            "pnl": event.get("old", event.get("pos", {})).get("unrealized_pnl"),
+        }
         with self._lock:
-            self._history.append({
-                "ts": datetime.now(timezone.utc),
-                "coin": event["coin"],
-                "type": event["type"],
-                "label": label,
-            })
+            self._history.append(entry)
+            _save_history(self._history)
 
     def get_history(self, since: datetime) -> list[dict]:
         with self._lock:

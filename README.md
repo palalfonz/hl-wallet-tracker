@@ -1,6 +1,6 @@
 # Hyperliquid Wallet Tracker
 
-> v1.2.0
+> v1.3.0
 
 A Telegram bot that monitors Hyperliquid wallets and sends real-time alerts when positions are opened, closed, increased, decreased, or flipped.
 
@@ -14,6 +14,13 @@ A Telegram bot that monitors Hyperliquid wallets and sends real-time alerts when
 - Add/remove wallets at runtime via bot commands
 - TP/SL orders shown on alerts and position snapshots with % distance from entry
 - Size displayed as `154.3000 HYPE ($10,352.14)`
+- Liquidation price shown on every position
+- Auto-alert when mark price is within 10% of liquidation
+- CLOSE alerts include realized PnL
+- Daily PnL summary sent at midnight UTC
+- Trade history persisted to `history.json` (survives restarts)
+- `/summary` — today's PnL or on-demand lookup for any address
+- `/status` — bot uptime and last poll time
 - Wallet list persisted to `config.json`
 
 ## Setup
@@ -85,6 +92,9 @@ In the ScriptHub dashboard → **+ Add Script**:
 | `/set_my_wallet <address>` | Set your personal wallet |
 | `/my_wallet` | View your personal wallet's positions |
 | `/trending [days]` | Most traded tokens — default 7d, e.g. `/trending 30` |
+| `/summary` | Today's PnL summary across all tracked wallets |
+| `/summary <address>` | On-demand position snapshot for any address |
+| `/status` | Bot uptime and last poll time |
 | `/help` | Show all commands |
 
 ## Config reference

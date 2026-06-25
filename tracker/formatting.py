@@ -1,3 +1,4 @@
+import time
 from collections import Counter
 from .state import WalletState
 
@@ -47,12 +48,15 @@ def _fmt_single_position(coin: str, p: dict, label: str, orders: dict | None = N
     orders_str = _fmt_orders(p["entry_px"], p["side"], orders)
     mark_px = p.get("mark_px", 0)
     mark_str = f"  <code>Mark ${mark_px:,.2f}</code>" if mark_px else ""
+    liq_px = p.get("liq_px")
+    liq_str = f"\n💀 Liq     <code>${liq_px:,.2f}</code>" if liq_px else ""
     return (
         f"{side_icon} <b>{label}</b>  ·  <b>{coin}</b>  ·  {p['side']}  ·  {p['leverage']}x\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"📌 Entry   <code>${p['entry_px']:,.2f}</code>{mark_str}\n"
         f"📦 Size    <code>{abs(p['size']):.4f} {coin}</code>{usd_str}\n"
         f"{pnl_icon} PnL     <code>{pnl_sign}{pnl:.2f} USD</code>{pnl_pct}"
+        f"{liq_str}"
         f"{orders_str}"
     )
 
@@ -105,11 +109,18 @@ def fmt_event(event: dict, label: str, orders: dict | None = None) -> str:
         side_icon = SIDE_EMOJI.get(p["side"], "⚪")
         usd = p.get("position_value", 0)
         usd_str = f"  <code>(${usd:,.2f})</code>" if usd else ""
+        pnl = p.get("unrealized_pnl", 0)
+        pnl_sign = "+" if pnl >= 0 else ""
+        pnl_icon = _pnl_emoji(pnl)
+        leverage = p.get("leverage", 1) or 1
+        margin = usd / leverage if usd else 0
+        pnl_pct = f"  <code>({pnl_sign}{pnl / margin * 100:.2f}%)</code>" if margin else ""
         return (
             f"🏁 <b>CLOSED</b>  ·  <b>{label}</b>  ·  <b>{coin}</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"📌 Entry was   <code>${p['entry_px']:,.2f}</code>\n"
-            f"📦 Size was    <code>{abs(p['size']):.4f} {coin}</code>{usd_str}"
+            f"📦 Size was    <code>{abs(p['size']):.4f} {coin}</code>{usd_str}\n"
+            f"{pnl_icon} PnL      <code>{pnl_sign}{pnl:.2f} USD</code>{pnl_pct}"
         )
     if t == "FLIP":
         p = event["pos"]
@@ -142,6 +153,50 @@ def fmt_event(event: dict, label: str, orders: dict | None = None) -> str:
             f"📦 Size    <code>{abs(old['size']):.4f}</code> → <code>{abs(p['size']):.4f} {coin}</code>{usd_str}"
         )
     return f"❓ Unknown event for {coin}"
+
+
+def fmt_liq_warning(coin: str, label: str, p: dict, pct_to_liq: float) -> str:
+    side_icon = SIDE_EMOJI.get(p["side"], "⚪")
+    liq_px = p.get("liq_px", 0)
+    mark_px = p.get("mark_px", 0)
+    return (
+        f"⚠️ <b>LIQ WARNING</b>  ·  <b>{label}</b>  ·  <b>{coin}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"{side_icon} {p['side']}  ·  {p['leverage']}x\n"
+        f"📍 Mark    <code>${mark_px:,.2f}</code>\n"
+        f"💀 Liq     <code>${liq_px:,.2f}</code>  <code>({pct_to_liq:.1f}% away)</code>"
+    )
+
+
+def fmt_daily_summary(history: list[dict], wallets: list[dict]) -> str:
+    if not history:
+        return "📊 <b>Daily Summary</b>\n\nNo trades recorded today."
+    closes = [e for e in history if e["type"] == "CLOSE"]
+    total_pnl = sum(e.get("pnl") or 0 for e in closes)
+    pnl_sign = "+" if total_pnl >= 0 else ""
+    pnl_icon = _pnl_emoji(total_pnl)
+    lines = [f"📊 <b>Daily Summary</b>\n"]
+    lines.append(f"Trades today: <code>{len(history)}</code>  ·  Closed: <code>{len(closes)}</code>")
+    if closes:
+        lines.append(f"{pnl_icon} Realized PnL: <code>{pnl_sign}{total_pnl:.2f} USD</code>")
+    coins = Counter(e["coin"] for e in history)
+    top = ", ".join(f"<b>{c}</b> ({n})" for c, n in coins.most_common(3))
+    lines.append(f"Most active: {top}")
+    return "\n".join(lines)
+
+
+def fmt_status(uptime_seconds: float, wallets: list[dict], last_poll: float) -> str:
+    h, rem = divmod(int(uptime_seconds), 3600)
+    m, s = divmod(rem, 60)
+    uptime_str = f"{h}h {m}m {s}s"
+    ago = int(time.time() - last_poll)
+    return (
+        f"🤖 <b>Bot Status</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"⏱ Uptime     <code>{uptime_str}</code>\n"
+        f"👛 Wallets    <code>{len(wallets)}</code>\n"
+        f"🔄 Last poll  <code>{ago}s ago</code>"
+    )
 
 
 def fmt_trending(history: list[dict], days: int) -> str:
