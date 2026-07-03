@@ -58,17 +58,18 @@ def poll_loop(config: dict, state: WalletState, send_fn, heartbeat: list | None 
                 positions = get_positions(addr)
                 events = state.update(addr, positions)
 
-                # Liquidation risk check
-                for coin, p in positions.items():
-                    pct = _pct_to_liq(p)
-                    warn_key = f"{addr}:{coin}"
-                    if pct is not None and pct <= LIQ_WARN_PCT:
-                        if warn_key not in liq_warned:
-                            send_fn(fmt_liq_warning(coin, label, p, pct))
-                            liq_warned.add(warn_key)
-                            log.warning("Liq warning sent for %s %s (%.1f%% away)", label, coin, pct)
-                    else:
-                        liq_warned.discard(warn_key)
+                # Liquidation risk check — only for wallets with liq_alert: true
+                if w.get("liq_alert", False):
+                    for coin, p in positions.items():
+                        pct = _pct_to_liq(p)
+                        warn_key = f"{addr}:{coin}"
+                        if pct is not None and pct <= LIQ_WARN_PCT:
+                            if warn_key not in liq_warned:
+                                send_fn(fmt_liq_warning(coin, label, p, pct))
+                                liq_warned.add(warn_key)
+                                log.warning("Liq warning sent for %s %s (%.1f%% away)", label, coin, pct)
+                        else:
+                            liq_warned.discard(warn_key)
 
                 open_events = [ev for ev in events if ev["type"] == "OPEN"]
                 orders = {}
