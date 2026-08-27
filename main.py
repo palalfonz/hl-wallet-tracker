@@ -16,8 +16,10 @@ from tracker.bot import (
     cmd_add_wallet,
     cmd_help,
     cmd_my_wallet,
+    cmd_network,
     cmd_remove_wallet,
     cmd_set_my_wallet,
+    cmd_set_network,
     cmd_status,
     cmd_summary,
     cmd_trending,
@@ -48,6 +50,8 @@ BOT_COMMANDS = [
     BotCommand("wallets",        "List tracked wallets"),
     BotCommand("add_wallet",     "Track a new wallet — /add_wallet <address> <label>"),
     BotCommand("remove_wallet",  "Stop tracking a wallet — /remove_wallet <label>"),
+    BotCommand("network",        "Show current network (mainnet/testnet)"),
+    BotCommand("set_network",    "Switch network — /set_network <mainnet|testnet>"),
     BotCommand("set_my_wallet",  "Set your personal wallet — /set_my_wallet <address>"),
     BotCommand("my_wallet",      "View your open positions"),
     BotCommand("trending",       "Most traded tokens — /trending [days]"),
@@ -94,14 +98,14 @@ def run():
     start_watchdog(heartbeat)
 
     last_poll_holder = [time.time()]
-    wallets_lock = Lock()
+    config_lock = Lock()
 
     async def post_init(application):
         loop_holder[0] = asyncio.get_running_loop()
         await application.bot.set_my_commands(BOT_COMMANDS)
         Thread(
             target=poll_loop,
-            args=(config, state, send_fn, heartbeat, last_poll_holder, wallets_lock),
+            args=(config, state, send_fn, heartbeat, last_poll_holder, config_lock),
             daemon=True,
         ).start()
         log("Command menu registered")
@@ -121,13 +125,15 @@ def run():
     app.bot_data["wallets"] = config["wallets"]
     app.bot_data["start_time"] = time.time()
     app.bot_data["last_poll_holder"] = last_poll_holder
-    app.bot_data["wallets_lock"] = wallets_lock
+    app.bot_data["config_lock"] = config_lock
 
     app.add_handler(MessageHandler(filters.TEXT, log_incoming), group=-1)
     app.add_handler(CommandHandler("active_trades",  cmd_active_trades))
     app.add_handler(CommandHandler("wallets",        cmd_wallets))
     app.add_handler(CommandHandler("add_wallet",     cmd_add_wallet))
     app.add_handler(CommandHandler("remove_wallet",  cmd_remove_wallet))
+    app.add_handler(CommandHandler("network",        cmd_network))
+    app.add_handler(CommandHandler("set_network",    cmd_set_network))
     app.add_handler(CommandHandler("set_my_wallet",  cmd_set_my_wallet))
     app.add_handler(CommandHandler("my_wallet",      cmd_my_wallet))
     app.add_handler(CommandHandler("trending",       cmd_trending))
