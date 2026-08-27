@@ -88,15 +88,19 @@ async def cmd_add_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         address = args[0].lower()
         label = " ".join(args[1:])
         config = context.bot_data["config"]
+        lock = context.bot_data["wallets_lock"]
 
-        if any(w["address"].lower() == address for w in config["wallets"]):
+        with lock:
+            already_tracked = any(w["address"].lower() == address for w in config["wallets"])
+            if not already_tracked:
+                new_wallet = {"address": address, "label": label}
+                config["wallets"] = config["wallets"] + [new_wallet]
+                context.bot_data["wallets"] = config["wallets"]
+                _save_config(config)
+
+        if already_tracked:
             await _reply(update, "/add_wallet", f"Wallet {address[:10]}... is already being tracked.")
             return
-
-        new_wallet = {"address": address, "label": label}
-        config["wallets"].append(new_wallet)
-        context.bot_data["wallets"] = config["wallets"]
-        _save_config(config)
 
         try:
             positions = get_positions(address)
@@ -122,17 +126,21 @@ async def cmd_remove_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         label = " ".join(context.args).lower()
         config = context.bot_data["config"]
-        before = len(config["wallets"])
-        config["wallets"] = [
-            w for w in config["wallets"] if w.get("label", "").lower() != label
-        ]
+        lock = context.bot_data["wallets_lock"]
 
-        if len(config["wallets"]) == before:
+        with lock:
+            found = any(w.get("label", "").lower() == label for w in config["wallets"])
+            if found:
+                config["wallets"] = [
+                    w for w in config["wallets"] if w.get("label", "").lower() != label
+                ]
+                context.bot_data["wallets"] = config["wallets"]
+                _save_config(config)
+
+        if not found:
             await _reply(update, "/remove_wallet", f"No wallet with label '{label}' found.")
             return
 
-        context.bot_data["wallets"] = config["wallets"]
-        _save_config(config)
         await _reply(update, "/remove_wallet", f"Removed wallet '{label}'.")
         log.info("Removed wallet with label %s", label)
     except Exception as e:
@@ -215,7 +223,8 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         uptime = time.time() - context.bot_data["start_time"]
-        last_poll = context.bot_data.get("last_poll", context.bot_data["start_time"])
+        last_poll_holder = context.bot_data.get("last_poll_holder")
+        last_poll = last_poll_holder[0] if last_poll_holder else context.bot_data["start_time"]
         msg = fmt_status(uptime, context.bot_data["wallets"], last_poll)
         await _reply(update, "/status", msg, parse_mode="HTML")
     except Exception as e:

@@ -6,7 +6,7 @@ import sys
 import time
 import traceback
 from datetime import datetime
-from threading import Thread
+from threading import Lock, Thread
 
 from telegram import BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
@@ -93,10 +93,17 @@ def run():
     heartbeat = [time.time()]
     start_watchdog(heartbeat)
 
+    last_poll_holder = [time.time()]
+    wallets_lock = Lock()
+
     async def post_init(application):
         loop_holder[0] = asyncio.get_running_loop()
         await application.bot.set_my_commands(BOT_COMMANDS)
-        Thread(target=poll_loop, args=(config, state, send_fn, heartbeat), daemon=True).start()
+        Thread(
+            target=poll_loop,
+            args=(config, state, send_fn, heartbeat, last_poll_holder, wallets_lock),
+            daemon=True,
+        ).start()
         log("Command menu registered")
 
     app = (
@@ -113,7 +120,8 @@ def run():
     app.bot_data["config"] = config
     app.bot_data["wallets"] = config["wallets"]
     app.bot_data["start_time"] = time.time()
-    app.bot_data["last_poll"] = time.time()
+    app.bot_data["last_poll_holder"] = last_poll_holder
+    app.bot_data["wallets_lock"] = wallets_lock
 
     app.add_handler(MessageHandler(filters.TEXT, log_incoming), group=-1)
     app.add_handler(CommandHandler("active_trades",  cmd_active_trades))
