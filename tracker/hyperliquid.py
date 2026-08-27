@@ -1,10 +1,16 @@
 import requests
 
-HL_API = "https://api.hyperliquid.xyz/info"
+HL_API_MAINNET = "https://api.hyperliquid.xyz/info"
+HL_API_TESTNET = "https://api.hyperliquid-testnet.xyz/info"
 
-def get_positions(address: str) -> dict:
+
+def _api_url(testnet: bool) -> str:
+    return HL_API_TESTNET if testnet else HL_API_MAINNET
+
+
+def get_positions(address: str, testnet: bool = False) -> dict:
     resp = requests.post(
-        HL_API,
+        _api_url(testnet),
         json={"type": "clearinghouseState", "user": address},
         timeout=10,
     )
@@ -36,14 +42,14 @@ _TP_TYPES = {"Take Profit Market", "Take Profit Limit"}
 _SL_TYPES = {"Stop Market", "Stop Limit"}
 
 
-def get_orders(address: str, positions: dict | None = None) -> dict:
+def get_orders(address: str, positions: dict | None = None, testnet: bool = False) -> dict:
     """Returns {coin: {"tp": [price, ...], "sl": price | None}}
 
     Uses frontendOpenOrders which includes trigger orders (position TP/SL).
     Trigger orders use triggerPx as the relevant price, not limitPx.
     """
     resp = requests.post(
-        HL_API,
+        _api_url(testnet),
         json={"type": "frontendOpenOrders", "user": address},
         timeout=10,
     )

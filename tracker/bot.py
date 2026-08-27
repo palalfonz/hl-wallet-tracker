@@ -22,6 +22,10 @@ def _is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return str(update.effective_chat.id) == allowed
 
 
+def _is_testnet(config: dict) -> bool:
+    return config.get("network", "mainnet") == "testnet"
+
+
 async def log_incoming(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.text:
         log.info("TG ← %s (chat %s)", update.message.text, update.effective_chat.id)
@@ -43,12 +47,13 @@ async def cmd_active_trades(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         wallets = context.bot_data["wallets"]
+        testnet = _is_testnet(context.bot_data["config"])
         all_pos = context.bot_data["state"].get_all_positions()
         all_orders = {}
         for w in wallets:
             try:
                 addr = w["address"].lower()
-                all_orders[addr] = get_orders(w["address"], all_pos.get(addr, {}))
+                all_orders[addr] = get_orders(w["address"], all_pos.get(addr, {}), testnet=testnet)
             except Exception:
                 pass
         msg = fmt_active_trades(context.bot_data["state"], wallets, all_orders)
@@ -88,7 +93,7 @@ async def cmd_add_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         address = args[0].lower()
         label = " ".join(args[1:])
         config = context.bot_data["config"]
-        lock = context.bot_data["wallets_lock"]
+        lock = context.bot_data["config_lock"]
 
         with lock:
             already_tracked = any(w["address"].lower() == address for w in config["wallets"])
@@ -103,7 +108,7 @@ async def cmd_add_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         try:
-            positions = get_positions(address)
+            positions = get_positions(address, testnet=_is_testnet(config))
             context.bot_data["state"].seed(address, positions)
         except Exception:
             log.warning("Failed to seed initial positions for %s", address)
@@ -126,7 +131,7 @@ async def cmd_remove_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         label = " ".join(context.args).lower()
         config = context.bot_data["config"]
-        lock = context.bot_data["wallets_lock"]
+        lock = context.bot_data["config_lock"]
 
         with lock:
             found = any(w.get("label", "").lower() == label for w in config["wallets"])
@@ -146,6 +151,58 @@ async def cmd_remove_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.exception("Error in /remove_wallet")
         await _reply(update, "/remove_wallet", f"Error: {e}")
+
+
+# ── Network ──────────────────────────────────────────────────────────────────
+
+async def cmd_network(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _is_authorized(update, context):
+        return
+    try:
+        network = context.bot_data["config"].get("network", "mainnet")
+        await _reply(
+            update, "/network",
+            f"Current network: <b>{network}</b>\nUse /set_network mainnet or /set_network testnet to switch.",
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        log.exception("Error in /network")
+        await _reply(update, "/network", f"Error: {e}")
+
+
+async def cmd_set_network(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Usage: /set_network <mainnet|testnet>"""
+    if not _is_authorized(update, context):
+        return
+    try:
+        if not context.args or context.args[0].lower() not in ("mainnet", "testnet"):
+            await _reply(update, "/set_network", "Usage: /set_network <mainnet|testnet>")
+            return
+
+        network = context.args[0].lower()
+        config = context.bot_data["config"]
+        lock = context.bot_data["config_lock"]
+
+        with lock:
+            unchanged = config.get("network", "mainnet") == network
+            if not unchanged:
+                config["network"] = network
+                _save_config(config)
+
+        if unchanged:
+            await _reply(update, "/set_network", f"Already on {network}.")
+            return
+
+        await _reply(
+            update, "/set_network",
+            f"Switched to <b>{network}</b>. Re-seeding tracked wallets' positions on the next poll cycle "
+            "— no OPEN/CLOSE alerts will fire for the switch itself.",
+            parse_mode="HTML",
+        )
+        log.info("Network switched to %s", network)
+    except Exception as e:
+        log.exception("Error in /set_network")
+        await _reply(update, "/set_network", f"Error: {e}")
 
 
 # ── My wallet ────────────────────────────────────────────────────────────────
@@ -182,9 +239,10 @@ async def cmd_my_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        positions = get_positions(address)
+        testnet = _is_testnet(config)
+        positions = get_positions(address, testnet=testnet)
         try:
-            orders = get_orders(address, positions)
+            orders = get_orders(address, positions, testnet=testnet)
         except Exception:
             orders = {}
         msg = fmt_positions(positions, label="My Wallet", orders=orders)
@@ -241,9 +299,10 @@ async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if context.args:
             address = context.args[0].lower()
-            positions = get_positions(address)
+            testnet = _is_testnet(context.bot_data["config"])
+            positions = get_positions(address, testnet=testnet)
             try:
-                orders = get_orders(address, positions)
+                orders = get_orders(address, positions, testnet=testnet)
             except Exception:
                 orders = {}
             msg = fmt_positions(positions, label=address[:10] + "...", orders=orders)
@@ -268,6 +327,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/wallets — list tracked wallets\n"
         "/add_wallet <address> <label> — start tracking a wallet\n"
         "/remove_wallet <label> — stop tracking a wallet\n\n"
+        "Network:\n"
+        "/network — show current network (mainnet/testnet)\n"
+        "/set_network <mainnet|testnet> — switch network\n\n"
         "My wallet:\n"
         "/set_my_wallet <address> — set your personal wallet\n"
         "/my_wallet — view your open positions\n\n"

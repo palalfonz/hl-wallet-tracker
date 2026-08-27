@@ -1,6 +1,6 @@
 # Hyperliquid Wallet Tracker
 
-> v1.3.0
+> v1.4.0
 
 A Telegram bot that monitors Hyperliquid wallets and sends real-time alerts when positions are opened, closed, increased, decreased, or flipped.
 
@@ -21,6 +21,7 @@ A Telegram bot that monitors Hyperliquid wallets and sends real-time alerts when
 - Trade history persisted to `history.json` (survives restarts)
 - `/summary` — today's PnL or on-demand lookup for any address
 - `/status` — bot uptime and last poll time
+- `/network` / `/set_network` — switch between Hyperliquid mainnet and testnet at runtime
 - Wallet list persisted to `config.json`
 
 ## Setup
@@ -89,6 +90,8 @@ In the ScriptHub dashboard → **+ Add Script**:
 | `/wallets` | List tracked wallets |
 | `/add_wallet <address> <label>` | Start tracking a wallet |
 | `/remove_wallet <label>` | Stop tracking a wallet |
+| `/network` | Show current network (mainnet/testnet) |
+| `/set_network <mainnet\|testnet>` | Switch network |
 | `/set_my_wallet <address>` | Set your personal wallet |
 | `/my_wallet` | View your personal wallet's positions |
 | `/trending [days]` | Most traded tokens — default 7d, e.g. `/trending 30` |
@@ -104,5 +107,6 @@ In the ScriptHub dashboard → **+ Add Script**:
 | `telegram_token` | string | required | Bot token from BotFather |
 | `telegram_chat_id` | number | required | Your chat ID (only this user can control the bot) |
 | `poll_interval_seconds` | number | `10` | How often to poll Hyperliquid |
+| `network` | string | `"mainnet"` | `"mainnet"` or `"testnet"`. Also switchable via `/set_network` |
 | `wallets` | array | `[]` | Wallets to track on startup |
 | `my_wallet` | string | — | Set via `/set_my_wallet`, used by `/my_wallet` |

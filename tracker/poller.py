@@ -24,24 +24,24 @@ def poll_loop(
     send_fn,
     heartbeat: list | None = None,
     last_poll: list | None = None,
-    wallets_lock=None,
+    config_lock=None,
 ):
     interval = config.get("poll_interval_seconds", 10)
 
-    def snapshot_wallets() -> list[dict]:
-        # Read config["wallets"] fresh each cycle (under lock) so /add_wallet
-        # and /remove_wallet — which reassign config["wallets"] to a new list —
-        # actually take effect on the running loop instead of it polling a
-        # stale captured reference forever.
-        if wallets_lock is not None:
-            with wallets_lock:
-                return list(config["wallets"])
-        return list(config["wallets"])
+    def snapshot() -> tuple[list[dict], bool]:
+        # Read config["wallets"]/config["network"] fresh each cycle (under lock)
+        # so /add_wallet, /remove_wallet, and /set_network — which reassign
+        # config entries rather than mutate in place — actually take effect on
+        # the running loop instead of it working off stale captured values.
+        if config_lock is not None:
+            with config_lock:
+                return list(config["wallets"]), config.get("network", "mainnet") == "testnet"
+        return list(config["wallets"]), config.get("network", "mainnet") == "testnet"
 
-    initial_wallets = snapshot_wallets()
+    initial_wallets, testnet = snapshot()
     for w in initial_wallets:
         try:
-            positions = get_positions(w["address"])
+            positions = get_positions(w["address"], testnet=testnet)
             state.seed(w["address"], positions)
             log.info("Seeded %s: %d open position(s)", w.get("label", w["address"]), len(positions))
         except Exception as e:
@@ -49,15 +49,35 @@ def poll_loop(
 
     last_summary_day = datetime.now(timezone.utc).date()
     liq_warned: set[str] = set()  # track coins already warned to avoid spam
+    current_network = "testnet" if testnet else "mainnet"
 
-    log.info("Polling every %ds for %d wallet(s)…", interval, len(initial_wallets))
+    log.info("Polling every %ds for %d wallet(s) on %s…", interval, len(initial_wallets), current_network)
     while True:
         time.sleep(interval)
         if heartbeat is not None:
             heartbeat[0] = time.time()
 
-        wallets = snapshot_wallets()
+        wallets, testnet = snapshot()
         label_map = {w["address"].lower(): w.get("label", w["address"][:8]) for w in wallets}
+
+        network = "testnet" if testnet else "mainnet"
+        if network != current_network:
+            # Positions on the other network are a completely different data
+            # set — reseed instead of diffing against the old network's
+            # positions, which would otherwise fire a false OPEN/CLOSE for
+            # every position just because the network switched.
+            log.info("Network switched %s -> %s; reseeding positions", current_network, network)
+            current_network = network
+            liq_warned.clear()
+            for w in wallets:
+                try:
+                    positions = get_positions(w["address"], testnet=testnet)
+                    state.seed(w["address"], positions)
+                except Exception as e:
+                    log.warning("Failed to reseed %s after network switch: %s", w["address"], e)
+            if last_poll is not None:
+                last_poll[0] = time.time()
+            continue
 
         # Daily summary at midnight UTC
         today = datetime.now(timezone.utc).date()
@@ -74,7 +94,7 @@ def poll_loop(
             addr = w["address"]
             label = label_map.get(addr.lower(), addr[:8])
             try:
-                positions = get_positions(addr)
+                positions = get_positions(addr, testnet=testnet)
                 events = state.update(addr, positions)
 
                 # Liquidation risk check — only for wallets with liq_alert: true
@@ -94,7 +114,7 @@ def poll_loop(
                 orders = {}
                 if open_events:
                     try:
-                        orders = get_orders(addr, positions)
+                        orders = get_orders(addr, positions, testnet=testnet)
                     except Exception as e:
                         log.warning("Failed to fetch orders for %s: %s", addr, e)
                 for ev in events:
