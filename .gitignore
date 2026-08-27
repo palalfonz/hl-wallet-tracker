@@ -1,6 +1,9 @@
 # Config (contains secrets)
 config.json
 
+# Runtime data
+history.json
+
 # Python
 __pycache__/
 *.py[cod]

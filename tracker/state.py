@@ -1,9 +1,12 @@
 import json
+import logging
 import os
 import threading
 from datetime import datetime, timezone
 
 HISTORY_FILE = "history.json"
+
+log = logging.getLogger(__name__)
 
 
 def _load_history() -> list[dict]:
@@ -15,7 +18,8 @@ def _load_history() -> list[dict]:
         for e in raw:
             e["ts"] = datetime.fromisoformat(e["ts"])
         return raw
-    except Exception:
+    except Exception as e:
+        log.warning("Failed to load %s (%s) — starting with empty history", HISTORY_FILE, e)
         return []
 
 

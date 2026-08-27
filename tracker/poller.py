@@ -18,12 +18,28 @@ def _pct_to_liq(p: dict) -> float | None:
     return abs(mark_px - liq_px) / mark_px * 100
 
 
-def poll_loop(config: dict, state: WalletState, send_fn, heartbeat: list | None = None):
-    wallets = config["wallets"]
+def poll_loop(
+    config: dict,
+    state: WalletState,
+    send_fn,
+    heartbeat: list | None = None,
+    last_poll: list | None = None,
+    wallets_lock=None,
+):
     interval = config.get("poll_interval_seconds", 10)
-    label_map = {w["address"].lower(): w.get("label", w["address"][:8]) for w in wallets}
 
-    for w in wallets:
+    def snapshot_wallets() -> list[dict]:
+        # Read config["wallets"] fresh each cycle (under lock) so /add_wallet
+        # and /remove_wallet — which reassign config["wallets"] to a new list —
+        # actually take effect on the running loop instead of it polling a
+        # stale captured reference forever.
+        if wallets_lock is not None:
+            with wallets_lock:
+                return list(config["wallets"])
+        return list(config["wallets"])
+
+    initial_wallets = snapshot_wallets()
+    for w in initial_wallets:
         try:
             positions = get_positions(w["address"])
             state.seed(w["address"], positions)
@@ -34,11 +50,14 @@ def poll_loop(config: dict, state: WalletState, send_fn, heartbeat: list | None 
     last_summary_day = datetime.now(timezone.utc).date()
     liq_warned: set[str] = set()  # track coins already warned to avoid spam
 
-    log.info("Polling every %ds for %d wallet(s)…", interval, len(wallets))
+    log.info("Polling every %ds for %d wallet(s)…", interval, len(initial_wallets))
     while True:
         time.sleep(interval)
         if heartbeat is not None:
             heartbeat[0] = time.time()
+
+        wallets = snapshot_wallets()
+        label_map = {w["address"].lower(): w.get("label", w["address"][:8]) for w in wallets}
 
         # Daily summary at midnight UTC
         today = datetime.now(timezone.utc).date()
@@ -85,3 +104,6 @@ def poll_loop(config: dict, state: WalletState, send_fn, heartbeat: list | None 
                     log.info("Event [%s] %s %s", ev["type"], label, ev["coin"])
             except Exception as e:
                 log.warning("Error polling %s: %s", addr, e)
+
+        if last_poll is not None:
+            last_poll[0] = time.time()
